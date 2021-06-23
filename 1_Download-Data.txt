@@ -1,0 +1,21 @@
+############################
+###Google BigQuery Script###
+############################
+
+
+URL to access BigQuery: https://console.cloud.google.com/bigquery
+
+
+Script for data pull. To collect all data:
+
+1. Repeat across each subreddit: "Conservative", "democrats", "socialism"
+2. Repeat across each monthly dataset: "...2018_01", "...2018_02", etc
+
+
+Script for data pull for r/Conservative in July 2018:
+
+SELECT posts.id as post_id, posts.url, posts.title as post_title, posts.subreddit, posts.created_utc as post_time, posts.score as post_score, comments_parent.body as parent_comment, comments_parent.author as parent_author, comments_parent.created_utc as parent_time, comments_parent.score as parent_score, comments_a.body as comment_body, comments_a.author as comment_author, comments_a.created_utc as comment_time, comments_a.score as comment_score, comments_a.link_id as comment_id, comments_a.parent_id as post_id_top, comments_a.subreddit
+FROM `fh-bigquery.reddit_comments.2018_07` comments_a
+LEFT JOIN `fh-bigquery.reddit_posts.2018_07` posts ON comments_a.link_id=CONCAT('t3_', posts.id)
+LEFT JOIN `fh-bigquery.reddit_comments.2018_07` comments_parent ON comments_a.parent_id=CONCAT('t1_', comments_parent.id)
+WHERE posts.subreddit = "Conservative" AND comments_a.body != "[deleted]" AND comments_a.body != "[removed]"

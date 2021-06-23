@@ -1,0 +1,1217 @@
+---
+title: "Peroduce Plots"
+author: "Pete Cuppernull"
+date: "6/5/2021"
+output: pdf_document
+---
+
+## Load packages
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(zoo)
+library(viridis)
+```
+
+## Load data
+```{r}
+data <- read_csv("data/embeddings-2d-d2v-all-subreddits.csv")
+data_umap <- read_csv("data/embeddings-50d-umap-all-subreddits.csv")
+```
+
+## Prep Data for plots
+```{r}
+data <- data %>%
+  select(Quarter, Year, label, Prompt, D2V_x, D2V_y) %>%
+  mutate(Quarter = paste(0, Quarter, sep = "")) %>%
+  mutate(date = paste(Quarter, Year, sep = "-")) %>%
+  mutate(date = as.Date(as.yearqtr(date, "%q-%Y")))
+
+```
+
+## Plots - 2d embedding
+```{r}
+prompts <- data %>%
+  select(Prompt) %>%
+  distinct() %>%
+  as.list()
+```
+
+Discrete Quarter Column
+```{r}
+data <- data %>%
+  mutate(quarter_discrete = paste("Q", 
+                                  substring(Quarter, 2),
+                                  " ",
+                                  as.character(Year),
+                                  sep = "")) %>%
+  mutate(quarter_discrete = factor(quarter_discrete,levels=c("Q1 2017",
+                                                             "Q2 2017",
+                                                             "Q3 2017",
+                                                             "Q4 2017",
+                                                             "Q1 2018",
+                                                             "Q2 2018",
+                                                             "Q3 2018",
+                                                             "Q4 2018",
+                                                             "Q1 2019",
+                                                             "Q2 2019"))) %>%
+  mutate(label = factor(label, levels = c("democrats", "conservative", "socialism"))) %>%
+  select(-Quarter) %>%
+  rename(Quarter = quarter_discrete)
+  
+```
+
+
+### Scatter Plot of All Obs
+
+By Quarter
+```{r}
+data %>%
+    filter(Prompt == as.character(prompts$Prompt[2])) %>%
+    mutate(Date = date) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(D2V_x, D2V_y, color = Date)) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompts$Prompt[2], "...\"", sep = ""),
+         caption = "Trained on monthly r/Conservative corpus") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ label)
+```
+
+By Quarter
+```{r}
+data %>%
+    #select(-Quarter) %>%
+    filter(Prompt == as.character(prompts$Prompt[2])) %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(D2V_x, D2V_y, color = Subreddit), size = 1) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompts$Prompt[2], "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Quarter)
+```
+
+
+Function - wrap labels
+```{r}
+create_plot <- function(prompt){
+  plot <- data %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(D2V_x, D2V_y, color = Date)) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Subreddit)
+  
+  ggsave(paste("plots/all-subreddits/main-scatter-subreddit-panel/", prompt, ".jpg", sep = ""),
+         plot = plot,
+         height = 4,
+         width = 10)
+}
+
+```
+
+
+```{r}
+map(prompts$Prompt, create_plot)
+```
+
+Wrap Date
+```{r}
+create_plot_date <- function(prompt){
+  plot <- data %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(D2V_x, D2V_y, color = Subreddit), size = 1) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Quarter)
+  
+  plot
+  
+  ggsave(paste("plots/all-subreddits/main-scatter-date-panel/", prompt, ".jpg", sep = ""), 
+         plot = plot,
+         height = 6,
+         width = 10)  
+}
+```
+
+```{r}
+map(prompts$Prompt, create_plot_date)
+```
+
+
+Wrap Date == REMOVE CONSERVATIVE
+```{r}
+create_plot_date_NoCon <- function(prompt){
+  plot <- data %>%
+    filter(Prompt == as.character(prompt),
+           label != "conservative") %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(D2V_x, D2V_y, color = Subreddit), size = 1) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Quarter)
+  
+  plot
+  
+  ggsave(paste("plots/all-subreddits/main-scatter-date-panel-NoCon/", prompt, ".jpg", sep = ""), 
+         plot = plot,
+         height = 6,
+         width = 10)  
+}
+```
+
+```{r}
+map(prompts$Prompt, create_plot_date_NoCon)
+```
+
+
+### Scatter plot for D and S for Q2 2018 - all prompts panels
+```{r}
+plot <- data %>%
+    filter(Quarter == "Q2 2018",
+           label != "conservative") %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(D2V_x, D2V_y, color = Subreddit), size = 1) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "Embedding Results for Q2 2018",
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, 
+             base_family='Times New Roman') +
+    facet_wrap(~ Prompt,
+               labeller = label_wrap_gen(width=30)) +
+    theme(strip.text = element_text(size=10))
+  
+  ggsave("plots/all-subreddits/main-scatter-date-panel-NoCon/q2-2018.jpg",
+         plot = plot,
+         height = 6,
+         width = 8)  
+
+```
+
+
+
+
+### Scatter Plot of Monthly Averages - wrap label
+```{r}
+create_plot_monthly_average <- function(prompt){
+  plot <- data %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    group_by(Date, Subreddit) %>%
+    summarize(x_avg = mean(D2V_x),
+              y_avg = mean(D2V_y)) %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(x_avg, y_avg, color = Date)) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Subreddit)
+  
+  ggsave(paste("plots/all-subreddits/monthly-average-subreddit/", prompt, ".jpg", sep = ""), plot = plot)
+}
+```
+
+```{r}
+map(prompts$Prompt, create_plot_monthly_average)
+```
+
+
+
+```{r}
+data %>%
+    filter(Prompt == as.character(prompts$Prompt[2])) %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    group_by(Date, Subreddit) %>%
+    summarize(x_avg = mean(D2V_x),
+              y_avg = mean(D2V_y)) %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(x_avg, y_avg, shape = Subreddit, color = Date), size = 3) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompts$Prompt[2], "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman')
+```
+
+```{r}
+create_plot_monthly_average_date <- function(prompt){
+  plot <- data %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    group_by(Date, Subreddit) %>%
+    summarize(x_avg = mean(D2V_x),
+              y_avg = mean(D2V_y)) %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(x_avg, y_avg, color = Subreddit)) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Date)
+  
+  plot
+   # ggsave(paste("plots/average-scatter/", prompt, ".jpg", sep = ""), plot = plot)
+}
+```
+
+```{r}
+map(prompts$Prompt, create_plot_monthly_average_date)
+```
+
+
+
+### Line Plot of Time and First Dimension
+```{r}
+line_plot_monthly_average <- function(prompt) {
+plot <- data %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Date = date) %>%
+    distinct() %>%
+    group_by(Date) %>%
+    summarize(x_avg = mean(D2V_x),
+           y_avg = mean(D2V_y)) %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_line(aes(Date, x_avg)) +
+    labs(x = "Month",
+         y = "X Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly r/Conservative corpus") +
+    theme_bw(base_size=12, base_family='Times New Roman') 
+
+  ggsave(paste("plots/monthly-line-x/", prompt, ".jpg", sep = ""), plot = plot)
+}
+```
+
+```{r}
+map(prompts$Prompt, line_plot_monthly_average)
+```
+
+### Line Plot of Time and Second Dimension
+
+```{r}
+line_plot_monthly_average <- function(prompt) {
+plot <- data %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Date = date) %>%
+    distinct() %>%
+    group_by(Date) %>%
+    summarize(x_avg = mean(D2V_x),
+           y_avg = mean(D2V_y)) %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_line(aes(Date, y_avg)) +
+    labs(x = "Month",
+         y = "X Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly r/Conservative corpus") +
+    theme_bw(base_size=12, base_family='Times New Roman') 
+
+  ggsave(paste("plots/monthly-line-y/", prompt, ".jpg", sep = ""), plot = plot)
+}
+```
+
+```{r}
+map(prompts$Prompt, line_plot_monthly_average)
+```
+
+### Test threshold before/after cambridge analytica
+
+Basically, repeat the main scatter plot above but for February and April 2018.
+
+Filter data
+```{r}
+data_c <- data %>%
+  filter(date == "2018-02-01" | date == "2018-04-01")
+```
+
+```{r}
+data_prompts <- read_csv("data/embeddings-2d-d2v.csv")
+```
+
+```{r}
+data_prompts %>%
+  select(Month, Year, Prompt, Result) %>%
+  filter((Month == 2 & Year == 2018 & Prompt == "Facebook's impact on democracy is") |
+           (Month == 4 & Year == 2018 & Prompt == "Facebook's impact on democracy is"))
+```
+
+
+```{r}
+create_plot <- function(prompt){
+  plot <- data_c %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Month = if_else(Month == "02", "February 2018", "April 2018")) %>%
+    mutate(Date = date) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(D2V_x, D2V_y, color = Month)) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly r/Conservative corpus") +
+    theme_bw(base_size=12, base_family='Times New Roman') 
+  
+  ggsave(paste("plots/spring-2018-scatter/", prompt, ".jpg", sep = ""), plot = plot)
+  plot
+}
+```
+
+```{r}
+map(prompts$Prompt, create_plot)
+```
+
+
+
+## Plots - 50d embedding
+```{r}
+prompts <- data_umap %>%
+  select(Prompt) %>%
+  distinct() %>%
+  as.list()
+```
+
+Discrete Quarter Column
+```{r}
+data_umap <- data_umap %>%
+  mutate(quarter_discrete = paste("Q", 
+                                  as.character(Quarter),
+                                  " ",
+                                  as.character(Year),
+                                  sep = "")) %>%
+  mutate(quarter_discrete = factor(quarter_discrete,levels=c("Q1 2017",
+                                                             "Q2 2017",
+                                                             "Q3 2017",
+                                                             "Q4 2017",
+                                                             "Q1 2018",
+                                                             "Q2 2018",
+                                                             "Q3 2018",
+                                                             "Q4 2018",
+                                                             "Q1 2019",
+                                                             "Q2 2019"))) %>%
+  mutate(label = factor(label, levels = c("democrats", "conservative", "socialism"))) %>%
+  select(-Quarter) %>%
+  rename(Quarter = quarter_discrete)
+  
+```
+
+
+### Scatter Plot of All Obs
+
+By Quarter
+```{r}
+data_umap %>%
+    filter(Prompt == as.character(prompts$Prompt[2])) %>%
+    mutate(Date = date) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(D2V_x, D2V_y, color = Date)) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompts$Prompt[2], "...\"", sep = ""),
+         caption = "Trained on monthly r/Conservative corpus") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ label)
+```
+
+By Quarter
+```{r}
+data_umap %>%
+    #select(-Quarter) %>%
+    filter(Prompt == as.character(prompts$Prompt[5])) %>%
+    mutate(Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(umap_x, umap_y, color = Subreddit), size = 1) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "UMAP Projects of 50-D D2V Text Generation Results",
+         subtitle = paste("Prompt: \"", prompts$Prompt[2], "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Quarter)
+```
+
+
+Function - wrap labels
+
+```{r}
+data_umap %>%
+    filter(Prompt == as.character(prompts$Prompt[5])) %>%
+    mutate(Subreddit = label) %>%
+    mutate(Quarter = as.Date(as.yearqtr(Quarter, "Q%q %Y"))) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(umap_x, umap_y, color = Quarter), size = .5) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "UMAP Projections of 50-Dimensional Doc2Vec Results",
+         subtitle = paste("Prompt: \"", prompts$Prompt[5], "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Subreddit)
+
+```
+
+```{r}
+create_plot <- function(prompt){
+  plot <- data_umap %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(umap_x, umap_y, color = Quarter)) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "UMAP Projections of 50-Dimensional Doc2Vec Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Subreddit)
+  
+  ggsave(paste("plots/umap/main-scatter-subreddit-panel/", prompt, ".jpg", sep = ""),
+         plot = plot,
+         height = 4,
+         width = 10)
+}
+
+```
+
+
+```{r}
+map(prompts$Prompt, create_plot)
+```
+
+Wrap Date
+```{r}
+create_plot_date <- function(prompt){
+  plot <- data_umap %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(umap_x, umap_y, color = Subreddit), size = 1) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "UMAP Projections of 50-Dimensional Doc2Vec Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Quarter)
+  
+  plot
+  
+  ggsave(paste("plots/umap/main-scatter-date-panel/", prompt, ".jpg", sep = ""), 
+         plot = plot,
+         height = 6,
+         width = 10)  
+}
+```
+
+```{r}
+map(prompts$Prompt, create_plot_date)
+```
+
+
+Wrap Date == REMOVE CONSERVATIVE
+```{r}
+create_plot_date_NoCon <- function(prompt){
+  plot <- data_umap %>%
+    filter(Prompt == as.character(prompt),
+           label != "conservative") %>%
+    mutate(Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(umap_x, umap_y, color = Subreddit), size = 1) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "UMAP Projections of 50-Dimensional Doc2Vec Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Quarter)
+  
+  plot
+  
+  ggsave(paste("plots/umap/main-scatter-date-panel-NoCon/", prompt, ".jpg", sep = ""), 
+         plot = plot,
+         height = 6,
+         width = 10)  
+}
+```
+
+```{r}
+map(prompts$Prompt, create_plot_date_NoCon)
+```
+
+
+### Scatter plot for D and S for Q2 2018 - all prompts panels
+```{r}
+plot <- data %>%
+    filter(Quarter == "Q2 2018",
+           label != "conservative") %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(D2V_x, D2V_y, color = Subreddit), size = 1) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "Embedding Results for Q2 2018",
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, 
+             base_family='Times New Roman') +
+    facet_wrap(~ Prompt,
+               labeller = label_wrap_gen(width=30)) +
+    theme(strip.text = element_text(size=10))
+  
+  ggsave("plots/all-subreddits/main-scatter-date-panel-NoCon/q2-2018.jpg",
+         plot = plot,
+         height = 6,
+         width = 8)  
+
+```
+
+
+#### Scatter pplot H1 2018 for eahc subreddit
+
+```{r}
+plot <- data_umap %>%
+    filter(Prompt == as.character(prompts$Prompt[5]),
+           Quarter == "Q1 2018" | Quarter == "Q2 2018") %>%
+    mutate(Subreddit = label) %>%
+  #  mutate(Quarter = as.Date(as.yearqtr(Quarter, "Q%q %Y"))) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(umap_x, umap_y, color = Subreddit), size = 1.5) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "UMAP Projections of 50-Dimensional Doc2Vec Results",
+         subtitle = paste("Prompt: \"", prompts$Prompt[5], "...\"", sep = "")) +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_grid(Subreddit ~ Quarter)
+
+  ggsave("plots/umap/h1-2018.jpg",
+         plot = plot,
+         height = 6,
+         width = 6)  
+```
+
+T test to assess significance of above results
+```{r}
+t_test_data <- data_umap %>%
+    filter(Prompt == as.character(prompts$Prompt[5]),
+           Quarter == "Q1 2018" | Quarter == "Q2 2018") %>%
+  select(label, umap_x, umap_y, Quarter)
+
+#Dem T Test - two periods
+dem_t_q1 <- t_test_data %>%
+  filter(label == "democrats",
+         Quarter == "Q1 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+dem_t_q2 <- t_test_data %>%
+  filter(label == "democrats",
+         Quarter == "Q2 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t.test(dem_t_q1, dem_t_q2)
+
+demy_t_q1 <- t_test_data %>%
+  filter(label == "democrats",
+         Quarter == "Q1 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+demy_t_q2 <- t_test_data %>%
+  filter(label == "democrats",
+         Quarter == "Q2 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t.test(demy_t_q1, demy_t_q2)
+
+# Conservative t test
+
+t_q1 <- t_test_data %>%
+  filter(label == "conservative",
+         Quarter == "Q1 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(label == "conservative",
+         Quarter == "Q2 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t.test(t_q1, t_q2)
+
+t_q1 <- t_test_data %>%
+  filter(label == "conservative",
+         Quarter == "Q1 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(label == "conservative",
+         Quarter == "Q2 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t.test(t_q1, t_q2)
+
+# Socialism t test
+
+t_q1 <- t_test_data %>%
+  filter(label == "socialism",
+         Quarter == "Q1 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(label == "socialism",
+         Quarter == "Q2 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t.test(t_q1, t_q2)
+
+t_q1 <- t_test_data %>%
+  filter(label == "socialism",
+         Quarter == "Q1 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(label == "socialism",
+         Quarter == "Q2 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t.test(t_q1, t_q2)
+
+# All t test
+
+t_q1 <- t_test_data %>%
+  filter(Quarter == "Q1 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(Quarter == "Q2 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t.test(t_q1, t_q2)
+
+t_q1 <- t_test_data %>%
+  filter(Quarter == "Q1 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(Quarter == "Q2 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t.test(t_q1, t_q2)
+
+```
+
+
+
+KS test to assess significance of above results
+```{r}
+t_test_data <- data_umap %>%
+    filter(Prompt == as.character(prompts$Prompt[5]),
+           Quarter == "Q1 2018" | Quarter == "Q2 2018") %>%
+  select(label, umap_x, umap_y, Quarter)
+
+#Dem T Test - two periods
+dem_t_q1 <- t_test_data %>%
+  filter(label == "democrats",
+         Quarter == "Q1 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+dem_t_q2 <- t_test_data %>%
+  filter(label == "democrats",
+         Quarter == "Q2 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+ks.test(dem_t_q1, dem_t_q2)
+
+demy_t_q1 <- t_test_data %>%
+  filter(label == "democrats",
+         Quarter == "Q1 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+demy_t_q2 <- t_test_data %>%
+  filter(label == "democrats",
+         Quarter == "Q2 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+ks.test(demy_t_q1, demy_t_q2)
+
+# Conservative t test
+
+t_q1 <- t_test_data %>%
+  filter(label == "conservative",
+         Quarter == "Q1 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(label == "conservative",
+         Quarter == "Q2 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+ks.test(t_q1, t_q2)
+
+t_q1 <- t_test_data %>%
+  filter(label == "conservative",
+         Quarter == "Q1 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(label == "conservative",
+         Quarter == "Q2 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+ks.test(t_q1, t_q2)
+
+# Socialism t test
+
+t_q1 <- t_test_data %>%
+  filter(label == "socialism",
+         Quarter == "Q1 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(label == "socialism",
+         Quarter == "Q2 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+ks.test(t_q1, t_q2)
+
+t_q1 <- t_test_data %>%
+  filter(label == "socialism",
+         Quarter == "Q1 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(label == "socialism",
+         Quarter == "Q2 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+ks.test(t_q1, t_q2)
+
+# All t test
+
+t_q1 <- t_test_data %>%
+  filter(Quarter == "Q1 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(Quarter == "Q2 2018") %>%
+  select(umap_x) %>%
+  pull()
+
+ks.test(t_q1, t_q2)
+
+t_q1 <- t_test_data %>%
+  filter(Quarter == "Q1 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+t_q2 <- t_test_data %>%
+  filter(Quarter == "Q2 2018") %>%
+  select(umap_y) %>%
+  pull()
+
+ks.test(t_q1, t_q2)
+
+```
+
+
+
+
+```{r}
+t_table <- data.frame(Subreddit = character(), 
+                      Axis = character(),
+                      t = numeric(),
+                      p = numeric())
+
+produce_t_table <- function(subreddit, axis){
+  q1 <- t_test_data %>%
+  filter(label == subreddit,
+         Quarter == "Q1 2018") %>%
+  select(axis) %>%
+  pull()
+  
+  q2 <- t_test_data %>%
+  filter(label == subreddit,
+         Quarter == "Q2 2018") %>%
+  select(axis) %>%
+  pull()
+
+t_results <- t.test(q1, q2)
+  
+t <- t_results$statistic[[1]]
+
+p <- t_results$p.value
+  
+t_table %>%
+  add_row(Subreddit = subreddit,
+          Axis = axis,
+          t = t,
+          p = p)
+}
+```
+Map Function to get results
+```{r}
+subreddits <- c("democrats", "conservative", "socialism")
+axes <- c("umap_x", "umap_y")
+
+cross2(subreddits, axes)
+map2(subreddits, axes, produce_t_table)
+```
+
+
+
+```{r}
+data_umap %>%
+    filter(Prompt == as.character(prompts$Prompt[9]),
+           Quarter == "Q1 2018" | Quarter == "Q2 2018") %>%
+    mutate(Subreddit = label) %>%
+  #  mutate(Quarter = as.Date(as.yearqtr(Quarter, "Q%q %Y"))) %>%
+    distinct() %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(umap_x, umap_y, color = Subreddit), size = 1.5) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "UMAP Projections of 50-Dimensional Doc2Vec Results",
+         subtitle = paste("Prompt: \"", prompts$Prompt[9], "...\"", sep = "")) +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_grid(Subreddit ~ Quarter)
+```
+
+
+
+
+### Scatter Plot of Monthly Averages - wrap label
+```{r}
+create_plot_monthly_average <- function(prompt){
+  plot <- data %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    group_by(Date, Subreddit) %>%
+    summarize(x_avg = mean(D2V_x),
+              y_avg = mean(D2V_y)) %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(x_avg, y_avg, color = Date)) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Subreddit)
+  
+  ggsave(paste("plots/all-subreddits/monthly-average-subreddit/", prompt, ".jpg", sep = ""), plot = plot)
+}
+```
+
+```{r}
+map(prompts$Prompt, create_plot_monthly_average)
+```
+
+
+
+```{r}
+data %>%
+    filter(Prompt == as.character(prompts$Prompt[2])) %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    group_by(Date, Subreddit) %>%
+    summarize(x_avg = mean(D2V_x),
+              y_avg = mean(D2V_y)) %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(x_avg, y_avg, shape = Subreddit, color = Date), size = 3) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompts$Prompt[2], "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman')
+```
+
+```{r}
+create_plot_monthly_average_date <- function(prompt){
+  plot <- data %>%
+    filter(Prompt == as.character(prompt)) %>%
+    mutate(Date = date,
+           Subreddit = label) %>%
+    distinct() %>%
+    group_by(Date, Subreddit) %>%
+    summarize(x_avg = mean(D2V_x),
+              y_avg = mean(D2V_y)) %>%
+    #group_by(Prompt) %>%
+    ggplot() +
+    geom_point(aes(x_avg, y_avg, color = Subreddit)) +
+    labs(x = "X Embedding",
+         y = "Y Embedding",
+         title = "2-Dimensional Doc2Vec Embeddings of Text Generation Results",
+         subtitle = paste("Prompt: \"", prompt, "...\"", sep = ""),
+         caption = "Trained on monthly corpora from r/Conservative, r/democrats, and r/socialism") +
+    theme_bw(base_size=12, base_family='Times New Roman') +
+    facet_wrap(~ Date)
+  
+  plot
+   # ggsave(paste("plots/average-scatter/", prompt, ".jpg", sep = ""), plot = plot)
+}
+```
+
+```{r}
+map(prompts$Prompt, create_plot_monthly_average_date)
+```
+
+## Statistical Tests
+
+### Is time significant?
+
+Load data
+```{r}
+data <- read_csv("data/embeddings-2d-d2v.csv")
+```
+
+
+Create date column
+```{r}
+data <- data %>%
+  select(Month, Year, Prompt, D2V_x, D2V_y) %>%
+  mutate(Month = paste(0, Month, sep = "")) %>%
+  mutate(date = paste(Month, Year, sep = "-")) %>%
+  mutate(date = as.Date(as.yearmon(date, "%m-%Y")))
+```
+
+
+```{r}
+month_ids <- data %>%
+  select(date) %>%
+  distinct() %>%
+  mutate(id = row_number())
+
+data_month_id <- data %>%
+  left_join(month_ids)
+```
+
+
+
+```{r}
+prompts <- data %>%
+  select(Prompt) %>%
+  distinct() %>%
+  as.list()
+```
+
+
+Function to Test Time significance
+```{r}
+
+time_test <- function(prompt) {
+df <- data_month_id %>%
+  filter(Prompt == as.character(prompt)) %>%
+  mutate(Date = date) %>%
+  distinct()
+
+#LM
+x_results <- lm(D2V_x ~ id, df)
+y_results <- lm(D2V_y ~ id, df)
+
+#LM with polynomial term
+x_results_poly <- lm(D2V_x ~ poly(id, 2), df)
+y_results_poly <- lm(D2V_y ~ poly(id, 2), df)
+
+#Results of LM
+x_sum <- summary(x_results)
+y_sum <- summary(y_results)
+
+coef_x <- x_sum$coefficients[2, 1]
+st_error_x <- x_sum$coefficients[2, 2]
+p_value_x <- x_sum$coefficients[2, 4]
+
+coef_y <- y_sum$coefficients[2, 1]
+st_error_y <- y_sum$coefficients[2, 2]
+p_value_y <- y_sum$coefficients[2, 4]
+
+#Results of LM poly
+#x
+x_poly_sum <- summary(x_results_poly)
+y_poly_sum <- summary(y_results_poly)
+
+coef_x_1 <- x_poly_sum$coefficients[2, 1]
+st_error_x_1 <- x_poly_sum$coefficients[2, 2]
+p_value_x_1 <- x_poly_sum$coefficients[2, 4]
+
+coef_x_2 <- x_poly_sum$coefficients[3, 1]
+st_error_x_2 <- x_poly_sum$coefficients[3, 2]
+p_value_x_2 <- x_poly_sum$coefficients[3, 4]
+
+#y
+coef_y_1 <- y_poly_sum$coefficients[2, 1]
+st_error_y_1 <- y_poly_sum$coefficients[2, 2]
+p_value_y_1 <- y_poly_sum$coefficients[2, 4]
+
+coef_y_2 <- y_poly_sum$coefficients[3, 1]
+st_error_y_2 <- y_poly_sum$coefficients[3, 2]
+p_value_y_2 <- y_poly_sum$coefficients[3, 4]
+
+#Collect all results into table
+x_results <- c(coef_x, st_error_x, p_value_x, NA, NA, NA)
+y_results <- c(coef_y, st_error_y, p_value_y, NA, NA, NA)
+
+x_poly_results <- c(coef_x_1, st_error_x_1, p_value_x_1, coef_x_2, st_error_x_2, p_value_x_2)
+y_poly_results <- c(coef_y_1, st_error_y_1, p_value_y_1, coef_y_2, st_error_y_2, p_value_y_2)
+
+results <- rbind(x_results, y_results, x_poly_results, y_poly_results)
+
+colnames(results) <- c("Coefficient", "St. Dev", "P Value", "Poly Coefficient", "Poly St. Dev", "Poly P Value")
+
+output <- list(prompt, results)
+
+return(output)
+
+}
+```
+
+
+```{r}
+regression_results <- map(prompts$Prompt, time_test)
+regression_results
+```
+
+Collect regression results into single table
+```{r}
+prompt <- regression_results[1][[1]][[1]][1]
+reg_table <- data.frame(regression_results[1][[1]][[2]]) %>%
+  rownames_to_column() %>%
+  mutate(prompt = as.character(prompt)) %>%
+  select(prompt, rowname:Poly.P.Value)
+
+regtable
+  
+```
+
+Function for reg results
+```{r}
+collect_reg_results <- function(prompt_id) {
+  prompt <- regression_results[prompt_id][[1]][[1]][1]
+  
+  reg_table <- data.frame(regression_results[prompt_id][[1]][[2]]) %>%
+  rownames_to_column() %>%
+  mutate(prompt = as.character(prompt)) %>%
+  select(prompt, rowname:Poly.P.Value)
+
+  reg_table
+}
+```
+
+
+```{r}
+all_reg_results <- map_dfr(seq(1:8), collect_reg_results)
+
+write_csv(all_reg_results, "data/all_reg_results.csv")
+```
+
+
