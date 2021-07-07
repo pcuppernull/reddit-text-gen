@@ -12,4 +12,4 @@ There are five files included in this repository that reproduce the results.
 4. Embeddings 50D UMAP -- Embed text in 50 dimensional space with Doc2Vec and reduce dimensionality with UMAP. (Python)
 5. Produce Plots -- RMD file to produce plots and tables for paper. (R)
 
-Link to the full paper coming soon!
+The written report for this project can be found HERE[https://voices.uchicago.edu/202102macs37000/2021/06/10/1166/].
